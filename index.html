@@ -6,9 +6,27 @@
     <title>Finanças Simples</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
       body {
         font-family: 'Inter', sans-serif;
+        background-color: #0b100d; /* Dark theme background */
+        color: #f0f2f0;
+      }
+      
+      /* Custom Scrollbar for Dark Theme */
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #0b100d; 
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #2A3530; 
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #ccff00; 
       }
     </style>
   <script type="importmap">

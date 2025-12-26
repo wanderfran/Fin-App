@@ -1,3 +1,4 @@
+
 export type TransactionType = 'expense' | 'income';
 
 export type Category = 
@@ -16,12 +17,14 @@ export interface User {
   name: string;
   email: string;
   phone?: string;
+  avatar_url?: string;
 }
 
 export interface UserProfile {
   id: string;
   display_name?: string;
   phone?: string;
+  avatar_url?: string;
 }
 
 export interface Transaction {
