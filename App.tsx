@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from './store';
 import { User } from './types';
-import { LoginScreen } from './components/Auth';
+import { LoginScreen, ResetPasswordScreen } from './components/Auth';
 import { SetupScreen } from './components/SetupScreen';
 import { Settings } from './components/Settings';
 import { Logo } from './components/Logo';
@@ -22,7 +22,9 @@ const App = () => {
   const [showSetup, setShowSetup] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [imgError, setImgError] = useState(false);
-  const [isRecovery, setIsRecovery] = useState(false);
+  
+  // Estado para controlar a tela de redefinição de senha fora do app
+  const [isRecoveryMode, setIsRecoveryMode] = useState(false);
   
   // Auth Session Management
   useEffect(() => {
@@ -32,11 +34,13 @@ const App = () => {
     }
 
     const initSession = async () => {
-        // Verifica hash na URL para recuperação de senha (fallback)
+        // Verifica se estamos no fluxo de recuperação de senha pelo hash da URL
         const hash = window.location.hash;
         if (hash && hash.includes('type=recovery')) {
-            setIsRecovery(true);
-            // setActiveTab('settings'); // Será definido no auth state change
+            setIsRecoveryMode(true);
+            setSessionLoading(false);
+            // Não carregamos o usuário aqui propositalmente para mostrar a tela de reset
+            return; 
         }
 
         const { data: { session } } = await supabase.auth.getSession();
@@ -64,13 +68,6 @@ const App = () => {
             }
 
             setUser(userData);
-            
-            // Se detectamos recovery, forçamos a aba de settings
-            if (hash && hash.includes('type=recovery')) {
-                 setActiveTab('settings');
-                 // Opcional: Limpar o hash da URL para ficar bonito
-                 window.history.replaceState(null, '', window.location.pathname);
-            }
         }
         setSessionLoading(false);
     };
@@ -78,36 +75,42 @@ const App = () => {
     initSession();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      // Evento disparado quando o link de recovery é clicado
       if (event === 'PASSWORD_RECOVERY') {
-        setIsRecovery(true);
-        setActiveTab('settings');
-      }
-
-      if (session?.user) {
-         // Re-fetch profile on auth change to ensure we have latest data
-         const fetchProfile = async () => {
-             const { data: profile } = await supabase
-                .from('profiles')
-                .select('display_name, phone, avatar_url')
-                .eq('id', session.user.id)
-                .single();
-             
-             setUser({
-                id: session.user.id,
-                email: session.user.email!,
-                name: profile?.display_name || session.user.email!.split('@')[0],
-                phone: profile?.phone,
-                avatar_url: profile?.avatar_url
-             });
-         };
-         fetchProfile();
-      } else {
+        setIsRecoveryMode(true);
+      } else if (event === 'SIGNED_IN' && session) {
+        // Se estivermos em modo recovery, não atualizamos o state do usuario ainda
+        // esperamos ele resetar a senha primeiro
+        if (!isRecoveryMode) {
+             // Fetch user data... (simplificado para não duplicar muito código, usa o useEffect acima para first load)
+             const u = session.user;
+             setUser(prev => prev || { id: u.id, email: u.email!, name: u.email!.split('@')[0] });
+        }
+      } else if (event === 'SIGNED_OUT') {
         setUser(null);
+        setIsRecoveryMode(false);
       }
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [isRecoveryMode]);
+
+  const handlePasswordResetSuccess = async () => {
+      // Limpa o hash da URL
+      window.history.replaceState(null, '', window.location.pathname);
+      setIsRecoveryMode(false);
+      
+      // Força o carregamento da sessão atual (que já deve estar autenticada pelo Supabase)
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+         setUser({
+            id: session.user.id,
+            email: session.user.email!,
+            name: session.user.email!.split('@')[0]
+         });
+         setActiveTab('dashboard');
+      }
+  };
 
   // Quando o usuário muda, reseta o estado de erro da imagem
   useEffect(() => {
@@ -122,7 +125,7 @@ const App = () => {
     await supabase.auth.signOut();
     setUser(null);
     setActiveTab('dashboard');
-    setIsRecovery(false);
+    setIsRecoveryMode(false);
   };
 
   const handleUpdateProfile = (newName: string, newPhone?: string, newAvatar?: string) => {
@@ -191,10 +194,17 @@ const App = () => {
     );
   }
 
+  // --- RENDERIZAÇÃO DA TELA DE RESET ---
+  if (isRecoveryMode) {
+      return <ResetPasswordScreen onSuccess={handlePasswordResetSuccess} />;
+  }
+
+  // --- RENDERIZAÇÃO DA TELA DE LOGIN NORMAL ---
   if (!user) {
     return <LoginScreen onLogin={handleLogin} onOpenSetup={() => setShowSetup(true)} />;
   }
 
+  // --- RENDERIZAÇÃO DO APP PRINCIPAL (DASHBOARD) ---
   return (
     <div className="flex min-h-screen bg-[#0b100d] text-[#f0f2f0] font-sans selection:bg-[#ccff00] selection:text-black animate-in fade-in duration-700">
       
@@ -299,7 +309,6 @@ const App = () => {
                 user={user} 
                 onUpdateProfile={handleUpdateProfile} 
                 onOpenSetup={() => setShowSetup(true)} 
-                isRecovery={isRecovery}
              />
           )}
         </div>

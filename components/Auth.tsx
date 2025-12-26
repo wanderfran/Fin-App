@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowRight, UserPlus, ArrowLeft, Loader2, Zap, Settings, User as UserIcon, Phone, KeyRound, Mail } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Loader2, User as UserIcon, Phone, Mail, Lock, CheckCircle2 } from 'lucide-react';
 import { User } from '../types';
 import { Logo } from './Logo';
 import { supabase } from '../supabaseClient';
@@ -11,6 +11,7 @@ interface AuthProps {
 
 type AuthView = 'login' | 'register' | 'forgotPassword';
 
+// --- TELA DE LOGIN / REGISTRO / ESQUECI SENHA ---
 export const LoginScreen: React.FC<AuthProps> = ({ onLogin, onOpenSetup }) => {
   const [view, setView] = useState<AuthView>('login');
   
@@ -26,7 +27,6 @@ export const LoginScreen: React.FC<AuthProps> = ({ onLogin, onOpenSetup }) => {
     setError('');
     setMsg('');
     setPassword('');
-    // Mantemos o email preenchido se o usuário estiver alternando entre login e esqueci senha
     if (view === 'register') setName('');
     if (view === 'register') setPhone('');
   };
@@ -81,19 +81,14 @@ export const LoginScreen: React.FC<AuthProps> = ({ onLogin, onOpenSetup }) => {
             }
         }
       } else if (view === 'forgotPassword') {
-        // Lógica de recuperação de senha
-        // window.location.origin pega a URL atual automaticamente.
-        // Se estiver na Vercel: https://finapp-rho.vercel.app
-        // Se estiver local: http://localhost:5173
-        // IMPORTANTE: Essa URL deve estar listada em "Redirect URLs" no Supabase Dashboard.
-        const redirectUrl = window.location.origin;
+        const redirectUrl = window.location.origin; // Redireciona para a raiz, o App.tsx vai detectar o hash
         
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
             redirectTo: redirectUrl, 
         });
         
         if (error) throw error;
-        setMsg(`Link enviado para ${email}. Verifique a caixa de entrada e spam.`);
+        setMsg(`Link enviado para ${email}. Verifique a caixa de entrada.`);
       }
     } catch (err: any) {
       console.error(err);
@@ -110,11 +105,9 @@ export const LoginScreen: React.FC<AuthProps> = ({ onLogin, onOpenSetup }) => {
 
   return (
     <div className="min-h-screen bg-[#0b100d] flex flex-col items-center justify-center p-6 relative overflow-hidden">
-      {/* Background Ambience */}
       <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_50%_0%,#1a2e1d,transparent)] pointer-events-none"></div>
 
       <div className="w-full max-w-md bg-[#161d19] rounded-[2.5rem] shadow-2xl border border-[#2A3530] overflow-hidden relative z-10">
-        
         <div className="bg-[#ccff00] p-10 text-center relative flex flex-col items-center">
           {view !== 'login' && (
              <button onClick={() => switchView('login')} className="absolute top-6 left-6 text-black/60 hover:text-black transition-colors">
@@ -214,6 +207,98 @@ export const LoginScreen: React.FC<AuthProps> = ({ onLogin, onOpenSetup }) => {
           </div>
         </div>
       </div>
+    </div>
+  );
+};
+
+// --- TELA DE REDEFINIÇÃO DE SENHA (NOVO) ---
+export const ResetPasswordScreen: React.FC<{ onSuccess: () => void }> = ({ onSuccess }) => {
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleUpdatePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPassword !== confirmPassword) {
+      setError('As senhas não coincidem.');
+      return;
+    }
+    
+    setLoading(true);
+    setError('');
+
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) throw error;
+      onSuccess();
+    } catch (err: any) {
+      setError(err.message || 'Erro ao redefinir senha.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-[#0b100d] flex flex-col items-center justify-center p-6 relative overflow-hidden">
+       <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_50%_0%,#1a2e1d,transparent)] pointer-events-none"></div>
+
+       <div className="w-full max-w-md bg-[#161d19] rounded-[2.5rem] shadow-2xl border border-[#2A3530] overflow-hidden relative z-10">
+          <div className="bg-[#ccff00] p-8 text-center">
+              <Logo className="h-10 w-auto mx-auto mb-2 text-black" textColor="black" />
+              <h2 className="text-xl font-bold text-black">Nova Senha</h2>
+          </div>
+
+          <div className="p-8">
+             <p className="text-[#88998C] text-sm text-center mb-6">
+                Defina sua nova senha para recuperar o acesso à sua conta.
+             </p>
+
+             {error && <div className="mb-4 p-3 bg-red-900/30 text-red-300 text-sm rounded-xl text-center border border-red-900/50">{error}</div>}
+
+             <form onSubmit={handleUpdatePassword} className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-[#5a6b61] uppercase">Nova Senha</label>
+                  <div className="relative">
+                    <input 
+                        type="password" 
+                        required 
+                        minLength={6}
+                        value={newPassword} 
+                        onChange={e => setNewPassword(e.target.value)} 
+                        className="w-full p-4 pl-12 bg-[#1F2923] text-white rounded-2xl border border-[#2A3530] outline-none focus:border-[#ccff00]" 
+                        placeholder="******" 
+                    />
+                    <Lock size={20} className="absolute left-4 top-4 text-[#5a6b61]" />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-[#5a6b61] uppercase">Confirmar Senha</label>
+                  <div className="relative">
+                    <input 
+                        type="password" 
+                        required 
+                        minLength={6}
+                        value={confirmPassword} 
+                        onChange={e => setConfirmPassword(e.target.value)} 
+                        className="w-full p-4 pl-12 bg-[#1F2923] text-white rounded-2xl border border-[#2A3530] outline-none focus:border-[#ccff00]" 
+                        placeholder="******" 
+                    />
+                    <CheckCircle2 size={20} className="absolute left-4 top-4 text-[#5a6b61]" />
+                  </div>
+                </div>
+
+                <button 
+                  type="submit" 
+                  disabled={loading}
+                  className="w-full bg-white hover:bg-gray-200 text-black font-bold py-4 rounded-2xl flex items-center justify-center gap-2 mt-6 transition-all text-lg shadow-lg disabled:opacity-70"
+                >
+                  {loading ? <Loader2 className="animate-spin" /> : 'Redefinir Senha'}
+                </button>
+             </form>
+          </div>
+       </div>
     </div>
   );
 };
