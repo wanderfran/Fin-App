@@ -22,6 +22,7 @@ const App = () => {
   const [showSetup, setShowSetup] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [imgError, setImgError] = useState(false);
+  const [isRecovery, setIsRecovery] = useState(false);
   
   // Auth Session Management
   useEffect(() => {
@@ -31,6 +32,13 @@ const App = () => {
     }
 
     const initSession = async () => {
+        // Verifica hash na URL para recuperação de senha (fallback)
+        const hash = window.location.hash;
+        if (hash && hash.includes('type=recovery')) {
+            setIsRecovery(true);
+            // setActiveTab('settings'); // Será definido no auth state change
+        }
+
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user) {
             const userData: User = {
@@ -56,13 +64,25 @@ const App = () => {
             }
 
             setUser(userData);
+            
+            // Se detectamos recovery, forçamos a aba de settings
+            if (hash && hash.includes('type=recovery')) {
+                 setActiveTab('settings');
+                 // Opcional: Limpar o hash da URL para ficar bonito
+                 window.history.replaceState(null, '', window.location.pathname);
+            }
         }
         setSessionLoading(false);
     };
 
     initSession();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setIsRecovery(true);
+        setActiveTab('settings');
+      }
+
       if (session?.user) {
          // Re-fetch profile on auth change to ensure we have latest data
          const fetchProfile = async () => {
@@ -102,6 +122,7 @@ const App = () => {
     await supabase.auth.signOut();
     setUser(null);
     setActiveTab('dashboard');
+    setIsRecovery(false);
   };
 
   const handleUpdateProfile = (newName: string, newPhone?: string, newAvatar?: string) => {
@@ -278,6 +299,7 @@ const App = () => {
                 user={user} 
                 onUpdateProfile={handleUpdateProfile} 
                 onOpenSetup={() => setShowSetup(true)} 
+                isRecovery={isRecovery}
              />
           )}
         </div>

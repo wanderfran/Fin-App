@@ -31,12 +31,6 @@ export const Logo: React.FC<LogoProps> = ({ className, textColor }) => {
 
         {/* Letter n */}
         <path d="M120 45V21H128V26C130 22 134 20 139 20C148 20 151 25 151 32V45H143V33C143 29 142 27 138 27C134 27 128 30 128 36V45H120Z" />
-
-        {/* Decorative Circle (Top Right) */}
-        <circle cx="162" cy="14" r="5" />
-
-        {/* Decorative Square (Bottom Left under F) */}
-        <rect x="72" y="52" width="6" height="6" rx="1" />
       </g>
     </svg>
   );

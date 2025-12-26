@@ -7,9 +7,10 @@ interface SettingsProps {
   user: User;
   onUpdateProfile: (name: string, phone?: string, avatarUrl?: string) => void;
   onOpenSetup: () => void;
+  isRecovery?: boolean;
 }
 
-export const Settings: React.FC<SettingsProps> = ({ user, onUpdateProfile, onOpenSetup }) => {
+export const Settings: React.FC<SettingsProps> = ({ user, onUpdateProfile, onOpenSetup, isRecovery }) => {
   const [name, setName] = useState(user.name);
   const [phone, setPhone] = useState(user.phone || '');
   const [profileLoading, setProfileLoading] = useState(false);
@@ -190,6 +191,13 @@ export const Settings: React.FC<SettingsProps> = ({ user, onUpdateProfile, onOpe
         <h1 className="text-3xl font-extrabold text-white">Sua Conta</h1>
         <p className="text-[#88998C]">Gerencie seus dados e privacidade.</p>
       </header>
+      
+      {isRecovery && (
+        <div className="bg-[#ccff00] text-black p-6 rounded-[2rem] font-bold text-center animate-pulse shadow-lg shadow-[#ccff00]/20">
+          <p className="text-lg">Modo de Recuperação Ativo</p>
+          <p className="text-sm font-medium opacity-80 mt-1">Crie uma nova senha abaixo para restaurar o acesso seguro à sua conta.</p>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           
@@ -309,7 +317,7 @@ export const Settings: React.FC<SettingsProps> = ({ user, onUpdateProfile, onOpe
 
           {/* Card 2: Segurança */}
           <div className="space-y-6">
-            <div className="bg-[#161d19] p-8 rounded-[2.5rem] border border-[#2A3530]">
+            <div className={`bg-[#161d19] p-8 rounded-[2.5rem] border ${isRecovery ? 'border-[#ccff00] shadow-[0_0_20px_rgba(204,255,0,0.1)]' : 'border-[#2A3530]'}`}>
                 <h3 className="text-xl font-bold text-white mb-8 flex items-center gap-3 border-b border-[#2A3530] pb-6">
                     <div className="p-2 bg-white text-black rounded-lg">
                         <ShieldCheck size={20} /> 

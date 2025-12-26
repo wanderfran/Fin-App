@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowRight, UserPlus, ArrowLeft, Loader2, Zap, Settings, User as UserIcon, Phone } from 'lucide-react';
+import { ArrowRight, UserPlus, ArrowLeft, Loader2, Zap, Settings, User as UserIcon, Phone, KeyRound, Mail } from 'lucide-react';
 import { User } from '../types';
 import { Logo } from './Logo';
 import { supabase } from '../supabaseClient';
@@ -9,7 +9,7 @@ interface AuthProps {
   onOpenSetup?: () => void;
 }
 
-type AuthView = 'login' | 'register';
+type AuthView = 'login' | 'register' | 'forgotPassword';
 
 export const LoginScreen: React.FC<AuthProps> = ({ onLogin, onOpenSetup }) => {
   const [view, setView] = useState<AuthView>('login');
@@ -26,12 +26,15 @@ export const LoginScreen: React.FC<AuthProps> = ({ onLogin, onOpenSetup }) => {
     setError('');
     setMsg('');
     setPassword('');
-    setName('');
-    setPhone('');
+    // Mantemos o email preenchido se o usuário estiver alternando entre login e esqueci senha
+    if (view === 'register') setName('');
+    if (view === 'register') setPhone('');
   };
 
   const translateError = (errorMsg: string) => {
     if (errorMsg.includes('Invalid login credentials')) return 'Credenciais incorretas.';
+    if (errorMsg.includes('User already registered')) return 'Email já cadastrado.';
+    if (errorMsg.includes('security purposes')) return 'Aguarde alguns segundos antes de tentar novamente.';
     return errorMsg || 'Erro inesperado.';
   };
 
@@ -54,7 +57,7 @@ export const LoginScreen: React.FC<AuthProps> = ({ onLogin, onOpenSetup }) => {
             phone: profile?.phone
           });
         }
-      } else {
+      } else if (view === 'register') {
         const { data, error } = await supabase.auth.signUp({ email, password });
         if (error) throw error;
         if (data.user) {
@@ -77,36 +80,32 @@ export const LoginScreen: React.FC<AuthProps> = ({ onLogin, onOpenSetup }) => {
                  resetForm();
             }
         }
+      } else if (view === 'forgotPassword') {
+        // Lógica de recuperação de senha
+        // window.location.origin pega a URL atual automaticamente.
+        // Se estiver na Vercel: https://finapp-rho.vercel.app
+        // Se estiver local: http://localhost:5173
+        // IMPORTANTE: Essa URL deve estar listada em "Redirect URLs" no Supabase Dashboard.
+        const redirectUrl = window.location.origin;
+        
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+            redirectTo: redirectUrl, 
+        });
+        
+        if (error) throw error;
+        setMsg(`Link enviado para ${email}. Verifique a caixa de entrada e spam.`);
       }
     } catch (err: any) {
+      console.error(err);
       setError(translateError(err.message || ''));
     } finally {
       setLoading(false);
     }
   };
 
-  const handleQuickLogin = async () => {
-    setLoading(true);
-    const devEmail = 'teste@exemplo.com';
-    const devPass = '123456';
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email: devEmail, password: devPass });
-      if (data?.user) {
-        onLogin({ id: data.user.id, email: data.user.email!, name: 'Usuário Teste' });
-        return;
-      }
-      if (error && error.message.includes('Invalid login credentials')) {
-         const { data: signUpData } = await supabase.auth.signUp({ email: devEmail, password: devPass });
-         if (signUpData?.user) {
-           await supabase.from('profiles').upsert({ id: signUpData.user.id, display_name: 'Usuário Teste' });
-           onLogin({ id: signUpData.user.id, email: signUpData.user.email!, name: 'Usuário Teste' });
-         }
-      }
-    } catch (err) {
-       onLogin({ id: 'dev-offline-id', email: 'admin@dev.local', name: 'Dev Mode' });
-    } finally {
-      setLoading(false);
-    }
+  const switchView = (newView: AuthView) => {
+      setView(newView);
+      resetForm();
   };
 
   return (
@@ -116,18 +115,9 @@ export const LoginScreen: React.FC<AuthProps> = ({ onLogin, onOpenSetup }) => {
 
       <div className="w-full max-w-md bg-[#161d19] rounded-[2.5rem] shadow-2xl border border-[#2A3530] overflow-hidden relative z-10">
         
-        {onOpenSetup && (
-          <button 
-            onClick={onOpenSetup}
-            className="absolute top-6 right-6 z-20 p-2 bg-white/5 hover:bg-white/10 text-[#88998C] rounded-full transition-colors"
-          >
-            <Settings size={20} />
-          </button>
-        )}
-
         <div className="bg-[#ccff00] p-10 text-center relative flex flex-col items-center">
           {view !== 'login' && (
-             <button onClick={() => { setView('login'); resetForm(); }} className="absolute top-6 left-6 text-black/60 hover:text-black transition-colors">
+             <button onClick={() => switchView('login')} className="absolute top-6 left-6 text-black/60 hover:text-black transition-colors">
                <ArrowLeft size={24} />
              </button>
           )}
@@ -136,9 +126,17 @@ export const LoginScreen: React.FC<AuthProps> = ({ onLogin, onOpenSetup }) => {
         </div>
 
         <div className="p-8">
-          <h2 className="text-2xl font-bold text-white mb-6 text-center">
-            {view === 'login' ? 'Bem-vindo de volta' : 'Crie sua conta'}
+          <h2 className="text-2xl font-bold text-white mb-2 text-center">
+            {view === 'login' && 'Bem-vindo de volta'}
+            {view === 'register' && 'Crie sua conta'}
+            {view === 'forgotPassword' && 'Recuperar Senha'}
           </h2>
+          
+          <p className="text-[#88998C] text-sm text-center mb-6">
+            {view === 'login' && 'Insira seus dados para acessar.'}
+            {view === 'register' && 'Comece a organizar suas finanças hoje.'}
+            {view === 'forgotPassword' && 'Enviaremos um link mágico para o seu email.'}
+          </p>
           
           {error && <div className="mb-4 p-3 bg-red-900/30 text-red-300 text-sm rounded-xl text-center border border-red-900/50">{error}</div>}
           {msg && <div className="mb-4 p-3 bg-[#ccff00]/10 text-[#ccff00] text-sm rounded-xl text-center border border-[#ccff00]/20">{msg}</div>}
@@ -165,36 +163,54 @@ export const LoginScreen: React.FC<AuthProps> = ({ onLogin, onOpenSetup }) => {
 
             <div className="space-y-2">
               <label className="text-xs font-bold text-[#5a6b61] uppercase">Email</label>
-              <input type="email" required value={email} onChange={e => setEmail(e.target.value)} className="w-full p-4 bg-[#1F2923] text-white rounded-2xl border border-[#2A3530] outline-none focus:border-[#ccff00]" placeholder="seu@email.com" />
+              <div className="relative">
+                <input type="email" required value={email} onChange={e => setEmail(e.target.value)} className="w-full p-4 pl-12 bg-[#1F2923] text-white rounded-2xl border border-[#2A3530] outline-none focus:border-[#ccff00]" placeholder="seu@email.com" />
+                <Mail size={20} className="absolute left-4 top-4 text-[#5a6b61]" />
+              </div>
             </div>
             
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-[#5a6b61] uppercase">Senha</label>
-              <input type="password" required minLength={6} value={password} onChange={e => setPassword(e.target.value)} className="w-full p-4 bg-[#1F2923] text-white rounded-2xl border border-[#2A3530] outline-none focus:border-[#ccff00]" placeholder="******" />
-            </div>
+            {view !== 'forgotPassword' && (
+                <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                        <label className="text-xs font-bold text-[#5a6b61] uppercase">Senha</label>
+                        {view === 'login' && (
+                            <button 
+                                type="button" 
+                                onClick={() => switchView('forgotPassword')}
+                                className="text-xs font-medium text-[#ccff00] hover:underline"
+                            >
+                                Esqueceu a senha?
+                            </button>
+                        )}
+                    </div>
+                    <input type="password" required minLength={6} value={password} onChange={e => setPassword(e.target.value)} className="w-full p-4 bg-[#1F2923] text-white rounded-2xl border border-[#2A3530] outline-none focus:border-[#ccff00]" placeholder="******" />
+                </div>
+            )}
             
             <button 
               type="submit" 
-              disabled={loading}
-              className="w-full bg-white hover:bg-gray-200 text-black font-bold py-4 rounded-2xl flex items-center justify-center gap-2 mt-6 transition-all text-lg shadow-lg"
+              disabled={loading || (view === 'forgotPassword' && !!msg)}
+              className="w-full bg-white hover:bg-gray-200 text-black font-bold py-4 rounded-2xl flex items-center justify-center gap-2 mt-6 transition-all text-lg shadow-lg disabled:opacity-70 disabled:cursor-not-allowed"
             >
-              {loading ? <Loader2 className="animate-spin" /> : (view === 'login' ? <>Entrar <ArrowRight size={20} /></> : 'Cadastrar')}
+              {loading ? <Loader2 className="animate-spin" /> : (
+                  view === 'login' ? <>Entrar <ArrowRight size={20} /></> : 
+                  view === 'register' ? 'Cadastrar' : 
+                  'Enviar Link'
+              )}
             </button>
           </form>
 
-          {view === 'login' && (
-            <div className="mt-6 pt-6 border-t border-[#2A3530]">
-                <button type="button" onClick={handleQuickLogin} disabled={loading} className="w-full bg-[#1F2923] hover:bg-[#2A3530] text-[#ccff00] border border-[#2A3530] font-bold py-3 rounded-2xl flex items-center justify-center gap-2 text-sm transition-all">
-                  {loading ? <Loader2 className="animate-spin" size={18} /> : <Zap size={18} />}
-                  Demo (Teste Rápido)
-                </button>
-            </div>
-          )}
-
           <div className="mt-6 text-center">
-            <button onClick={() => { setView(view === 'login' ? 'register' : 'login'); resetForm(); }} className="text-[#88998C] text-sm font-medium hover:text-white transition-colors">
-              {view === 'login' ? 'Criar conta gratuita' : 'Voltar para login'}
-            </button>
+            {view === 'login' && (
+                <button onClick={() => switchView('register')} className="text-[#88998C] text-sm font-medium hover:text-white transition-colors">
+                Criar conta gratuita
+                </button>
+            )}
+            {(view === 'register' || view === 'forgotPassword') && (
+                <button onClick={() => switchView('login')} className="text-[#88998C] text-sm font-medium hover:text-white transition-colors">
+                Voltar para login
+                </button>
+            )}
           </div>
         </div>
       </div>
